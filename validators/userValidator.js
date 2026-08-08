@@ -22,3 +22,7 @@ export const loginSchema = z
     message: "Either email or phone is required",
     path: ["email"],
   });
+
+export const refreshTokenSchema = z.object({
+  refreshToken: z.string().min(1, "Refresh token is required"),
+});

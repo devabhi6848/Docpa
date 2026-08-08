@@ -34,6 +34,11 @@ const userSchema = new Schema(
       },
       required: [true, 'Role is required'],
     },
+    refresh_tokens: {
+      type: [String],
+      default: [],
+      select: false,
+    },
   },
   { timestamps: true } 
 );
