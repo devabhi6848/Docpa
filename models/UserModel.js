@@ -1,6 +1,5 @@
 import mongoose from "mongoose";
 import { Schema } from "mongoose";
- 
 
 const userSchema = new Schema(
   {
@@ -38,7 +37,7 @@ const userSchema = new Schema(
   },
   { timestamps: true } 
 );
- 
+
 // Require at least one of email/phone to exist
 userSchema.pre('validate', function (next) {
   if (!this.email && !this.phone) {
@@ -46,7 +45,7 @@ userSchema.pre('validate', function (next) {
   }
   next();
 });
- 
+
 const User = mongoose.model('User', userSchema);
 
 export default User;

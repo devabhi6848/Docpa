@@ -1,16 +1,18 @@
 import express from "express";
-const app =express();
+import { config } from "./config/env.js";
+import routes from "./routes/index.js";
+import { errorHandler } from "./middleware/errorHandler.js";
 
-const port =  3000;
+const app = express();
 
+app.use(express.json());
 
+// API Routes
+app.use("/api", routes);
 
-app.use("/",);
+// Centralized Error Handling Middleware
+app.use(errorHandler);
 
-app.listen(port,(err)=>{
-    if(err){
-        console.log("error in starting the server ", port);
-    }
-  
-    console.log("Server Started successfully on port", port);
-})
+app.listen(config.port, () => {
+  console.log(`Server started successfully on port ${config.port}`);
+});
