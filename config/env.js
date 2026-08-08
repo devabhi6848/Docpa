@@ -3,7 +3,6 @@ dotenv.config();
 
 const isProduction = process.env.NODE_ENV === "production";
 
-// Enforce strict environment check in production mode
 if (isProduction) {
   const requiredEnvVars = ["MONGO_URI", "JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET"];
   const missing = requiredEnvVars.filter((key) => !process.env[key]);
@@ -19,16 +18,20 @@ export const config = {
   mongoUri: process.env.MONGO_URI || "mongodb://localhost:27017/docpa",
   corsOrigin: process.env.CORS_ORIGIN || "*",
   
-  // JWT Access & Refresh Token Config
+  // JWT Access & Refresh Token Config (Longer refresh token for mobile apps: 30d)
   jwtAccessSecret: process.env.JWT_ACCESS_SECRET || "dev_access_token_secret_change_in_production",
   jwtAccessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || "15m",
   jwtRefreshSecret: process.env.JWT_REFRESH_SECRET || "dev_refresh_token_secret_change_in_production",
-  jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "7d",
+  jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "30d",
 
   bcryptSaltRounds: parseInt(process.env.BCRYPT_SALT_ROUNDS, 10) || 10,
 
-  // Google Auth Config
-  googleClientId: process.env.GOOGLE_CLIENT_ID || "",
+  // Google Auth Config for Mobile & Web (Supports multiple Client IDs for Android, iOS, Web)
+  googleClientIds: [
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_ANDROID_CLIENT_ID,
+    process.env.GOOGLE_IOS_CLIENT_ID,
+  ].filter(Boolean),
 
   // OTP Config
   otpExpiresInMinutes: parseInt(process.env.OTP_EXPIRES_IN_MINUTES, 10) || 5,
@@ -43,7 +46,7 @@ export const config = {
     from: process.env.SMTP_FROM || '"Docpa Health" <noreply@docpa.com>',
   },
 
-  // SMS Gateway Config (e.g. Twilio / Fast2SMS)
+  // SMS Gateway Config
   sms: {
     apiKey: process.env.SMS_API_KEY || "",
     senderId: process.env.SMS_SENDER_ID || "DOCPA",

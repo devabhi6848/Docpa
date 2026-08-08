@@ -11,6 +11,8 @@ import {
   registerWithOtp,
   loginWithOtp,
   loginWithGoogle,
+  getProfile,
+  updateProfile,
   refreshToken,
   logoutUser,
 } from "../../controllers/userController.js";
@@ -68,7 +70,7 @@ router.post(
   loginWithOtp
 );
 
-// Google OAuth
+// Google OAuth (Android / iOS / Web)
 router.post(
   "/google",
   authLimiter,
@@ -76,6 +78,10 @@ router.post(
   validate(googleLoginSchema),
   loginWithGoogle
 );
+
+// User Profile Endpoints (Mobile App / Me)
+router.get("/me", protect, getProfile);
+router.patch("/me", protect, updateProfile);
 
 // Token Refresh & Logout
 router.post("/refresh", validate(refreshTokenSchema), refreshToken);

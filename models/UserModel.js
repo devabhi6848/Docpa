@@ -3,6 +3,15 @@ import { Schema } from "mongoose";
 
 const userSchema = new Schema(
   {
+    name: {
+      type: String,
+      trim: true,
+      maxlength: [100, 'Name is too long'],
+    },
+    avatar_url: {
+      type: String,
+      default: '',
+    },
     email: {
       type: String,
       unique: true,
@@ -52,6 +61,17 @@ const userSchema = new Schema(
       },
       required: [true, 'Role is required'],
       default: 'patient',
+    },
+    // Mobile App Device & Push Notification (FCM / APNs) Tracking
+    fcm_tokens: {
+      type: [String],
+      default: [],
+      select: false,
+    },
+    device_info: {
+      platform: { type: String, enum: ['android', 'ios', 'web', 'unknown'], default: 'unknown' },
+      app_version: { type: String, default: '1.0.0' },
+      device_model: { type: String, default: '' },
     },
     refresh_tokens: {
       type: [String],

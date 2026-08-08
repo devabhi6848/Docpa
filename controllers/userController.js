@@ -4,6 +4,8 @@ import {
   otpRegisterService,
   googleLoginService,
   otpLoginService,
+  getUserProfileService,
+  updateUserProfileService,
   refreshTokenService,
   logoutUserService,
 } from "../services/userService.js";
@@ -88,12 +90,36 @@ export const loginWithOtp = async (req, res, next) => {
 };
 
 /**
- * Login / Register using Google OAuth ID Token
+ * Login / Register using Google OAuth ID Token (Mobile Android / iOS / Web)
  */
 export const loginWithGoogle = async (req, res, next) => {
   try {
     const authData = await googleLoginService(req.body);
     return sendSuccess(res, "Google login successful", authData, 200);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get Authenticated User Profile (GET /api/v1/users/me)
+ */
+export const getProfile = async (req, res, next) => {
+  try {
+    const profile = await getUserProfileService(req.user.id);
+    return sendSuccess(res, "User profile fetched successfully", { user: profile }, 200);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Update Authenticated User Profile & FCM Token (PATCH /api/v1/users/me)
+ */
+export const updateProfile = async (req, res, next) => {
+  try {
+    const updatedProfile = await updateUserProfileService(req.user.id, req.body);
+    return sendSuccess(res, "User profile updated successfully", { user: updatedProfile }, 200);
   } catch (error) {
     next(error);
   }
@@ -113,12 +139,12 @@ export const refreshToken = async (req, res, next) => {
 };
 
 /**
- * Logout & Revoke Refresh Token
+ * Logout & Revoke Tokens
  */
 export const logoutUser = async (req, res, next) => {
   try {
-    const { refreshToken: token } = req.body;
-    await logoutUserService(req.user.id, token);
+    const { refreshToken: token, fcmToken } = req.body;
+    await logoutUserService(req.user.id, token, fcmToken);
     return sendSuccess(res, "Logged out successfully", null, 200);
   } catch (error) {
     next(error);
