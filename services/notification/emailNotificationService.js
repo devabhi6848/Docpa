@@ -1,22 +1,39 @@
 import nodemailer from "nodemailer";
+import dns from "dns";
 import { config } from "../../config/env.js";
+
+// Force Node.js to resolve IPv4 addresses first.
+// Solves ENETUNREACH (IPv6 network unreachable) errors on cloud platforms like Render.
+dns.setDefaultResultOrder("ipv4first");
 
 let transporter = null;
 
 if (config.smtp.host && config.smtp.user) {
-  transporter = nodemailer.createTransport({
-    host: config.smtp.host,
-    port: config.smtp.port,
-    secure: config.smtp.secure,
-    auth: {
-      user: config.smtp.user,
-      pass: config.smtp.pass,
-    },
-    family: 4, // Force IPv4 to prevent IPv6 DNS resolution timeouts on cloud platforms (Render/AWS/etc.)
-    connectionTimeout: 10000, // 10s connection timeout
-    greetingTimeout: 5000,   // 5s greeting timeout
-    socketTimeout: 15000,    // 15s socket timeout
-  });
+  if (config.smtp.host.includes("gmail")) {
+    transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: config.smtp.user,
+        pass: config.smtp.pass,
+      },
+      connectionTimeout: 10000, // 10s connection timeout
+      greetingTimeout: 5000,   // 5s greeting timeout
+      socketTimeout: 15000,    // 15s socket timeout
+    });
+  } else {
+    transporter = nodemailer.createTransport({
+      host: config.smtp.host,
+      port: config.smtp.port,
+      secure: config.smtp.secure,
+      auth: {
+        user: config.smtp.user,
+        pass: config.smtp.pass,
+      },
+      connectionTimeout: 10000, // 10s connection timeout
+      greetingTimeout: 5000,   // 5s greeting timeout
+      socketTimeout: 15000,    // 15s socket timeout
+    });
+  }
 }
 
 /**

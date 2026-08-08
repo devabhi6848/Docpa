@@ -1,6 +1,11 @@
 import express from "express";
 import helmet from "helmet";
 import cors from "cors";
+import dns from "dns";
+
+// Force Node.js to prioritize IPv4 over IPv6 globally (prevents ENETUNREACH errors on Render/cloud instances)
+dns.setDefaultResultOrder("ipv4first");
+
 import { config } from "./config/env.js";
 import { connectDB } from "./config/db.js";
 import routes from "./routes/index.js";
