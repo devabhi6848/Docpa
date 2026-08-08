@@ -83,11 +83,10 @@ const userSchema = new Schema(
 );
 
 // Require at least one contact identifier (email, phone, or google_id)
-userSchema.pre('validate', function (next) {
+userSchema.pre('validate', function () {
   if (!this.email && !this.phone && !this.google_id) {
-    return next(new Error('At least one of email, phone, or Google ID is required'));
+    throw new Error('At least one of email, phone, or Google ID is required');
   }
-  next();
 });
 
 const User = mongoose.model('User', userSchema);
