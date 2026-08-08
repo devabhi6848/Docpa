@@ -5,8 +5,8 @@ const userSchema = new Schema(
   {
     email: {
       type: String,
-      required: [true, 'Email is required'],
       unique: true,
+      sparse: true,
       lowercase: true,
       trim: true,
       match: [
@@ -23,8 +23,26 @@ const userSchema = new Schema(
     },
     password_hash: {
       type: String,
-      required: [true, 'Password hash is required'],
+      required: false,
       select: false, 
+    },
+    google_id: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+    auth_providers: {
+      type: [String],
+      enum: ['password', 'google', 'email_otp', 'mobile_otp'],
+      default: ['password'],
+    },
+    is_email_verified: {
+      type: Boolean,
+      default: false,
+    },
+    is_phone_verified: {
+      type: Boolean,
+      default: false,
     },
     role: {
       type: String,
@@ -33,6 +51,7 @@ const userSchema = new Schema(
         message: '{VALUE} is not a valid role',
       },
       required: [true, 'Role is required'],
+      default: 'patient',
     },
     refresh_tokens: {
       type: [String],
@@ -43,10 +62,10 @@ const userSchema = new Schema(
   { timestamps: true } 
 );
 
-// Require at least one of email/phone to exist
+// Require at least one contact identifier (email, phone, or google_id)
 userSchema.pre('validate', function (next) {
-  if (!this.email && !this.phone) {
-    return next(new Error('Either email or phone is required'));
+  if (!this.email && !this.phone && !this.google_id) {
+    return next(new Error('At least one of email, phone, or Google ID is required'));
   }
   next();
 });
