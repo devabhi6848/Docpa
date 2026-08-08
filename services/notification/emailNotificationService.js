@@ -12,6 +12,10 @@ if (config.smtp.host && config.smtp.user) {
       user: config.smtp.user,
       pass: config.smtp.pass,
     },
+    family: 4, // Force IPv4 to prevent IPv6 DNS resolution timeouts on cloud platforms (Render/AWS/etc.)
+    connectionTimeout: 10000, // 10s connection timeout
+    greetingTimeout: 5000,   // 5s greeting timeout
+    socketTimeout: 15000,    // 15s socket timeout
   });
 }
 
