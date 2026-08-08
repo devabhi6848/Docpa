@@ -1,28 +1,21 @@
+import { sendError } from "../utils/responseUtil.js";
+
 export const errorHandler = (err, req, res, next) => {
   err.statusCode = err.statusCode || 500;
-  err.status = err.status || "error";
 
   if (process.env.NODE_ENV === "development") {
-    return res.status(err.statusCode).json({
-      status: err.status,
-      message: err.message,
+    return sendError(res, err.message, err.statusCode, {
       stack: err.stack,
       error: err,
     });
   }
 
-  // Production error response
+  // Production operational error response
   if (err.isOperational) {
-    return res.status(err.statusCode).json({
-      status: err.status,
-      message: err.message,
-    });
+    return sendError(res, err.message, err.statusCode);
   }
 
-  // Programming or unknown error
+  // Unknown or programming error
   console.error("ERROR 💥", err);
-  return res.status(500).json({
-    status: "error",
-    message: "Something went wrong on the server!",
-  });
+  return sendError(res, "Something went wrong on the server!", 500);
 };
