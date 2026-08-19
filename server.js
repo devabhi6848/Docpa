@@ -69,6 +69,17 @@ app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 // Deep NoSQL Operator Injection Sanitization
 app.use(sanitizeNoSql);
 
+// System Health Check for Uptime Monitors & Load Balancers (Unthrottled)
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    service: "docpa-backend",
+    uptime_seconds: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+    environment: config.env,
+  });
+});
+
 // General Rate Limiting for all API routes
 app.use("/api", apiLimiter);
 
