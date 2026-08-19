@@ -10,19 +10,39 @@ import crypto from "crypto";
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
+import Clinic from "../models/ClinicModel.js";
+import DoctorProfile from "../models/DoctorProfileModel.js";
+import ClinicStaff from "../models/ClinicStaffModel.js";
+
 /**
  * Register user with Password
  */
-export const registerUserService = async ({ email, phone, password, role, name }) => {
-  if (email) {
-    const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
+export const registerUserService = async ({
+  email,
+  phone,
+  password,
+  role = "doctor",
+  name,
+  clinic_name,
+  specialization,
+  registration_number,
+  consultation_fee,
+}) => {
+  const cleanEmail = email && email.trim() ? email.toLowerCase().trim() : undefined;
+  const cleanPhone = phone && phone.trim() ? phone.trim() : undefined;
+
+  if (!cleanEmail && !cleanPhone) {
+    throw new AppError("At least one of email or phone is required", 400);
+  }
+
+  if (cleanEmail) {
+    const existingUser = await User.findOne({ email: cleanEmail });
     if (existingUser) {
       throw new AppError("User with this email already exists", 400);
     }
   }
 
-  if (phone) {
-    const cleanPhone = phone.trim();
+  if (cleanPhone) {
     const existingUser = await User.findOne({ phone: cleanPhone });
     if (existingUser) {
       throw new AppError("User with this phone number already exists", 400);
@@ -32,9 +52,9 @@ export const registerUserService = async ({ email, phone, password, role, name }
   const password_hash = await hashPassword(password);
 
   const user = await User.create({
-    name,
-    email: email ? email.toLowerCase().trim() : undefined,
-    phone: phone ? phone.trim() : undefined,
+    name: name || (cleanEmail ? cleanEmail.split("@")[0] : "Doctor"),
+    email: cleanEmail,
+    phone: cleanPhone,
     password_hash,
     role,
     auth_providers: ["password"],
@@ -42,14 +62,69 @@ export const registerUserService = async ({ email, phone, password, role, name }
     locked_until: null,
   });
 
-  return formatUserResponse(user);
+  // If registering as doctor or clinic admin, create initial clinic & doctor profile
+  if (role === "doctor" || role === "clinic_admin") {
+    const clinic = await Clinic.create({
+      name: clinic_name || `${user.name}'s Clinic`,
+      tagline: "Multispeciality Clinic & Healthcare",
+      owner_id: user._id,
+      phone: cleanPhone || "",
+      email: cleanEmail || "",
+      consultation_fee: Number(consultation_fee) || 500,
+    });
+
+    user.active_clinic_id = clinic._id;
+    await user.save();
+
+    await ClinicStaff.create({
+      clinic_id: clinic._id,
+      user_id: user._id,
+      role: role === "doctor" ? "doctor" : "clinic_admin",
+      permissions: ["all"],
+      is_active: true,
+    });
+
+    if (role === "doctor") {
+      await DoctorProfile.create({
+        user_id: user._id,
+        title: "Dr.",
+        qualifications: ["MBBS"],
+        specializations: [specialization || "General Physician"],
+        medical_registration_number: registration_number || "",
+      });
+    }
+  }
+
+  return await issueUserTokens(user);
 };
 
 /**
  * Login user with Password + Anti-Brute-Force Lockout Defense
  */
-export const loginUserService = async ({ email, phone, password, fcm_token, device_info }) => {
-  const query = email ? { email: email.toLowerCase().trim() } : { phone: phone.trim() };
+export const loginUserService = async ({
+  identifier,
+  email,
+  phone,
+  password,
+  fcm_token,
+  device_info,
+}) => {
+  let query;
+  if (identifier && identifier.trim()) {
+    const cleanId = identifier.trim();
+    if (cleanId.includes("@")) {
+      query = { email: cleanId.toLowerCase() };
+    } else {
+      query = { phone: cleanId };
+    }
+  } else if (email && email.trim()) {
+    query = { email: email.toLowerCase().trim() };
+  } else if (phone && phone.trim()) {
+    query = { phone: phone.trim() };
+  } else {
+    throw new AppError("Email or phone is required", 400);
+  }
+
   const user = await User.findOne(query).select("+password_hash +refresh_tokens +fcm_tokens");
 
   if (!user) {
@@ -348,8 +423,11 @@ const issueUserTokens = async (user) => {
   await user.save();
 
   return {
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
     tokens,
     user: formatUserResponse(user),
+    activeClinicId: user.active_clinic_id,
   };
 };
 

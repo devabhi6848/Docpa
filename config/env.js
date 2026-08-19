@@ -16,7 +16,9 @@ export const config = {
   isProduction,
   port: parseInt(process.env.PORT, 10) || 5000,
   mongoUri: process.env.MONGO_URI || "mongodb://localhost:27017/docpa",
-  corsOrigin: process.env.CORS_ORIGIN || "*",
+  corsOrigin: process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(",").map((s) => s.trim())
+    : ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000"],
   
   // JWT Access & Refresh Token Config (Longer refresh token for mobile apps: 30d)
   jwtAccessSecret: process.env.JWT_ACCESS_SECRET || "dev_access_token_secret_change_in_production",

@@ -34,8 +34,8 @@ export const getAvailableAuthMethods = async (req, res, next) => {
  */
 export const registerUser = async (req, res, next) => {
   try {
-    const userData = await registerUserService(req.body);
-    return sendSuccess(res, "User registered successfully", { user: userData }, 201);
+    const authData = await registerUserService(req.body);
+    return sendSuccess(res, "User registered successfully", authData, 201);
   } catch (error) {
     next(error);
   }
