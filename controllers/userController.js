@@ -59,7 +59,7 @@ export const loginUser = async (req, res, next) => {
 export const sendOtp = async (req, res, next) => {
   try {
     const result = await sendOtpService(req.body);
-    return sendSuccess(res, result.message, null, 200);
+    return sendSuccess(res, result.message, result.data || null, 200);
   } catch (error) {
     next(error);
   }

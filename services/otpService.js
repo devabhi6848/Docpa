@@ -3,6 +3,7 @@ import { generateNumericOtp, hashOtp } from "../utils/otpUtil.js";
 import { sendEmailOtp } from "./notification/emailNotificationService.js";
 import { sendSmsOtp } from "./notification/smsNotificationService.js";
 import { AppError } from "../utils/AppError.js";
+import { config } from "../config/env.js";
 
 /**
  * Generate and send OTP via Email or SMS
@@ -31,7 +32,13 @@ export const sendOtpService = async ({ identifier, type }) => {
     throw new AppError("Invalid OTP channel type", 400);
   }
 
-  return { message: `OTP sent successfully to ${type}` };
+  // In development mode, return OTP so the frontend UI can display/fill it
+  const devData = !config.isProduction ? { otp: rawOtp } : null;
+
+  return {
+    message: `OTP sent successfully to ${type}`,
+    data: devData,
+  };
 };
 
 /**

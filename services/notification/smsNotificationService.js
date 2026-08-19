@@ -7,7 +7,7 @@ import { config } from "../../config/env.js";
  */
 export const sendSmsOtp = async (phone, otp) => {
   if (!config.sms.apiKey) {
-    console.log(`[DEV MODE / NO SMS GATEWAY] 📱 OTP for ${phone}: [ ${otp} ]`);
+    // In development / when SMS API key is not configured, OTP is returned in the API response for UI display instead of console
     return true;
   }
 
