@@ -12,11 +12,17 @@ export const protect = (req, res, next) => {
 
   try {
     const decoded = verifyAccessToken(token);
-    req.user = decoded;
+    // Normalize user ID access
+    const id = decoded.id || decoded.userId;
+    req.user = {
+      ...decoded,
+      id,
+      userId: id,
+    };
     next();
   } catch (err) {
     if (err.name === "TokenExpiredError") {
-      return next(new AppError("Access token has expired", 401));
+      return next(new AppError("Access token has expired. Please refresh your session.", 401));
     }
     return next(new AppError("Invalid or corrupted access token", 401));
   }

@@ -6,6 +6,7 @@ import {
   getTvDisplayQueue,
 } from "../../controllers/queueController.js";
 import { protect } from "../../middleware/authMiddleware.js";
+import { tenantGuard } from "../../middleware/tenantGuard.js";
 import { authorizeRoles } from "../../middleware/roleMiddleware.js";
 import { validate } from "../../middleware/validateSchema.js";
 import {
@@ -20,6 +21,7 @@ router.get("/tv-display/:clinicId", getTvDisplayQueue);
 
 // Protected routes
 router.use(protect);
+router.use(tenantGuard);
 
 // 1. Generate OPD Token
 router.post(

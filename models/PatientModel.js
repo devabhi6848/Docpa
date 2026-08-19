@@ -1,4 +1,6 @@
 import mongoose from "mongoose";
+import { encryptField, decryptField } from "../utils/cryptoUtil.js";
+
 const { Schema } = mongoose;
 
 const patientSchema = new Schema(
@@ -64,6 +66,17 @@ const patientSchema = new Schema(
       enum: ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "unknown"],
       default: "unknown",
     },
+    // Sensitive PHI encrypted at rest
+    national_id: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    emergency_contact: {
+      name: { type: String, default: "" },
+      phone: { type: String, default: "" },
+      relation: { type: String, default: "" },
+    },
     allergies: {
       type: [String],
       default: [],
@@ -72,10 +85,14 @@ const patientSchema = new Schema(
       type: [String],
       default: [],
     },
+    confidential_notes: {
+      type: String,
+      default: "",
+    },
     guardian_name: {
       type: String,
       trim: true,
-      default: "", // Father/Mother/Spouse
+      default: "",
     },
     guardian_relationship: {
       type: String,
@@ -103,11 +120,31 @@ const patientSchema = new Schema(
   { timestamps: true }
 );
 
-// Auto-generate UHID if not present
+// Auto-generate UHID if not present and Encrypt sensitive PHI fields
 patientSchema.pre("save", function () {
   if (!this.uhid) {
     const randomSuffix = Math.floor(100000 + Math.random() * 900000);
     this.uhid = `UHID-${randomSuffix}`;
+  }
+
+  // Encrypt national ID if updated and not already encrypted
+  if (this.isModified("national_id") && this.national_id && !this.national_id.includes(":")) {
+    this.national_id = encryptField(this.national_id);
+  }
+
+  // Encrypt confidential notes if modified
+  if (this.isModified("confidential_notes") && this.confidential_notes && !this.confidential_notes.includes(":")) {
+    this.confidential_notes = encryptField(this.confidential_notes);
+  }
+});
+
+// Decrypt on document retrieval
+patientSchema.post("init", function (doc) {
+  if (doc.national_id && doc.national_id.includes(":")) {
+    doc.national_id = decryptField(doc.national_id);
+  }
+  if (doc.confidential_notes && doc.confidential_notes.includes(":")) {
+    doc.confidential_notes = decryptField(doc.confidential_notes);
   }
 });
 

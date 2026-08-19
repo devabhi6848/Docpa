@@ -1,23 +1,29 @@
 import User from "../models/UserModel.js";
 import { hashPassword, comparePassword } from "../utils/passwordUtil.js";
 import { generateTokenPair, verifyRefreshToken } from "../utils/jwtUtil.js";
+import { hashSecret } from "../utils/cryptoUtil.js";
 import { verifyGoogleIdToken } from "./googleAuthService.js";
 import { verifyOtpService } from "./otpService.js";
 import { AppError } from "../utils/AppError.js";
+import crypto from "crypto";
+
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
 /**
  * Register user with Password
  */
 export const registerUserService = async ({ email, phone, password, role, name }) => {
   if (email) {
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
     if (existingUser) {
       throw new AppError("User with this email already exists", 400);
     }
   }
 
   if (phone) {
-    const existingUser = await User.findOne({ phone });
+    const cleanPhone = phone.trim();
+    const existingUser = await User.findOne({ phone: cleanPhone });
     if (existingUser) {
       throw new AppError("User with this phone number already exists", 400);
     }
@@ -27,33 +33,66 @@ export const registerUserService = async ({ email, phone, password, role, name }
 
   const user = await User.create({
     name,
-    email,
-    phone,
+    email: email ? email.toLowerCase().trim() : undefined,
+    phone: phone ? phone.trim() : undefined,
     password_hash,
     role,
-    auth_providers: ['password'],
+    auth_providers: ["password"],
+    failed_login_attempts: 0,
+    locked_until: null,
   });
 
   return formatUserResponse(user);
 };
 
 /**
- * Login user with Password
+ * Login user with Password + Anti-Brute-Force Lockout Defense
  */
 export const loginUserService = async ({ email, phone, password, fcm_token, device_info }) => {
-  const query = email ? { email } : { phone };
+  const query = email ? { email: email.toLowerCase().trim() } : { phone: phone.trim() };
   const user = await User.findOne(query).select("+password_hash +refresh_tokens +fcm_tokens");
 
-  if (!user || !user.password_hash) {
-    throw new AppError("Invalid credentials or user registered via OAuth/OTP", 401);
+  if (!user) {
+    throw new AppError("Invalid credentials or user not found", 401);
   }
 
+  // 1. Check if account is currently locked
+  if (user.locked_until && user.locked_until > new Date()) {
+    const remainingMinutes = Math.ceil((user.locked_until.getTime() - Date.now()) / (60 * 1000));
+    throw new AppError(
+      `Account is temporarily locked due to multiple failed login attempts. Please try again in ${remainingMinutes} minute(s).`,
+      423
+    );
+  }
+
+  if (!user.password_hash) {
+    throw new AppError("Account was created via Google OAuth or OTP. Please use that login method.", 400);
+  }
+
+  // 2. Validate Password
   const isPasswordValid = await comparePassword(password, user.password_hash);
   if (!isPasswordValid) {
-    throw new AppError("Invalid credentials", 401);
+    user.failed_login_attempts = (user.failed_login_attempts || 0) + 1;
+
+    if (user.failed_login_attempts >= MAX_FAILED_ATTEMPTS) {
+      user.locked_until = new Date(Date.now() + LOCKOUT_DURATION_MS);
+      await user.save();
+      throw new AppError(
+        "Account locked due to 5 consecutive failed login attempts. Please try again after 15 minutes.",
+        423
+      );
+    }
+
+    await user.save();
+    const attemptsLeft = MAX_FAILED_ATTEMPTS - user.failed_login_attempts;
+    throw new AppError(`Invalid credentials. ${attemptsLeft} attempt(s) remaining before lockout.`, 401);
   }
 
-  // Update FCM token & device info if provided by mobile app
+  // 3. Reset failed attempts upon successful login
+  user.failed_login_attempts = 0;
+  user.locked_until = null;
+
+  // Update FCM token & device info
   if (fcm_token && !user.fcm_tokens.includes(fcm_token)) {
     user.fcm_tokens.push(fcm_token);
   }
@@ -68,7 +107,7 @@ export const loginUserService = async ({ email, phone, password, fcm_token, devi
  * Dedicated User Registration via OTP (Email or Mobile)
  */
 export const otpRegisterService = async ({ identifier, otp, type, role = "patient", password, name, fcm_token, device_info }) => {
-  const query = type === "email" ? { email: identifier } : { phone: identifier };
+  const query = type === "email" ? { email: identifier.toLowerCase().trim() } : { phone: identifier.trim() };
   const existingUser = await User.findOne(query);
 
   if (existingUser) {
@@ -94,8 +133,8 @@ export const otpRegisterService = async ({ identifier, otp, type, role = "patien
     fcm_tokens: fcm_token ? [fcm_token] : [],
     device_info: device_info || {},
     ...(type === "email"
-      ? { email: identifier, is_email_verified: true }
-      : { phone: identifier, is_phone_verified: true }),
+      ? { email: identifier.toLowerCase().trim(), is_email_verified: true }
+      : { phone: identifier.trim(), is_phone_verified: true }),
   };
 
   const user = await User.create(userData);
@@ -111,27 +150,29 @@ export const googleLoginService = async ({ idToken, role = "patient", fcm_token,
   const { googleId, email, name, picture } = googleData;
 
   let user = await User.findOne({
-    $or: [{ google_id: googleId }, { email }],
+    $or: [{ google_id: googleId }, { email: email.toLowerCase() }],
   }).select("+refresh_tokens +fcm_tokens");
 
   if (user) {
     if (!user.google_id) user.google_id = googleId;
-    if (!user.auth_providers.includes('google')) user.auth_providers.push('google');
+    if (!user.auth_providers.includes("google")) user.auth_providers.push("google");
     if (!user.name && name) user.name = name;
     if (!user.avatar_url && picture) user.avatar_url = picture;
     user.is_email_verified = true;
+    user.failed_login_attempts = 0;
+    user.locked_until = null;
     if (fcm_token && !user.fcm_tokens.includes(fcm_token)) user.fcm_tokens.push(fcm_token);
     if (device_info) user.device_info = { ...user.device_info, ...device_info };
     await user.save();
   } else {
     user = await User.create({
-      name: name || '',
-      avatar_url: picture || '',
-      email,
+      name: name || "",
+      avatar_url: picture || "",
+      email: email.toLowerCase(),
       google_id: googleId,
       role,
       is_email_verified: true,
-      auth_providers: ['google'],
+      auth_providers: ["google"],
       fcm_tokens: fcm_token ? [fcm_token] : [],
       device_info: device_info || {},
     });
@@ -146,7 +187,7 @@ export const googleLoginService = async ({ idToken, role = "patient", fcm_token,
 export const otpLoginService = async ({ identifier, otp, type, role = "patient", fcm_token, device_info }) => {
   await verifyOtpService({ identifier, otp, type });
 
-  const query = type === "email" ? { email: identifier } : { phone: identifier };
+  const query = type === "email" ? { email: identifier.toLowerCase().trim() } : { phone: identifier.trim() };
 
   let user = await User.findOne(query).select("+refresh_tokens +fcm_tokens");
 
@@ -155,6 +196,8 @@ export const otpLoginService = async ({ identifier, otp, type, role = "patient",
     if (!user.auth_providers.includes(providerName)) user.auth_providers.push(providerName);
     if (type === "email") user.is_email_verified = true;
     if (type === "phone") user.is_phone_verified = true;
+    user.failed_login_attempts = 0;
+    user.locked_until = null;
     if (fcm_token && !user.fcm_tokens.includes(fcm_token)) user.fcm_tokens.push(fcm_token);
     if (device_info) user.device_info = { ...user.device_info, ...device_info };
     await user.save();
@@ -165,7 +208,7 @@ export const otpLoginService = async ({ identifier, otp, type, role = "patient",
       auth_providers: [providerName],
       fcm_tokens: fcm_token ? [fcm_token] : [],
       device_info: device_info || {},
-      ...(type === "email" ? { email: identifier, is_email_verified: true } : { phone: identifier, is_phone_verified: true }),
+      ...(type === "email" ? { email: identifier.toLowerCase().trim(), is_email_verified: true } : { phone: identifier.trim(), is_phone_verified: true }),
     };
 
     user = await User.create(userData);
@@ -178,7 +221,7 @@ export const otpLoginService = async ({ identifier, otp, type, role = "patient",
  * Get user profile (/api/v1/users/me)
  */
 export const getUserProfileService = async (userId) => {
-  const user = await User.findById(userId);
+  const user = await User.findById(userId).populate("active_clinic_id");
   if (!user) {
     throw new AppError("User not found", 404);
   }
@@ -208,13 +251,17 @@ export const updateUserProfileService = async (userId, { name, avatar_url, fcm_t
 };
 
 /**
- * Refresh Access Token using Refresh Token
+ * Refresh Access Token using Refresh Token Rotation (RTR) & Reuse Detection
  */
 export const refreshTokenService = async (incomingRefreshToken) => {
+  if (!incomingRefreshToken) {
+    throw new AppError("Refresh token is required", 400);
+  }
+
   let decoded;
   try {
     decoded = verifyRefreshToken(incomingRefreshToken);
-  } catch (err) {
+  } catch {
     throw new AppError("Invalid or expired refresh token", 401);
   }
 
@@ -223,45 +270,81 @@ export const refreshTokenService = async (incomingRefreshToken) => {
     throw new AppError("User no longer exists", 401);
   }
 
-  if (!user.refresh_tokens.includes(incomingRefreshToken)) {
-    throw new AppError("Refresh token is invalid or has been revoked", 401);
+  const incomingHash = hashSecret(incomingRefreshToken);
+
+  // Check if token exists in user's active refresh tokens
+  const existingTokenIndex = (user.refresh_tokens || []).findIndex(
+    (rt) => rt.token_hash === incomingHash
+  );
+
+  // Token Reuse Detection: If token is valid JWT but not found in active list, possible theft!
+  if (existingTokenIndex === -1) {
+    // Revoke all active sessions for this user immediately
+    user.refresh_tokens = [];
+    await user.save();
+    throw new AppError("Refresh token reuse detected. All sessions have been revoked for your security.", 401);
   }
 
-  const newTokens = generateTokenPair({ id: user._id, role: user.role });
+  const existingToken = user.refresh_tokens[existingTokenIndex];
+  const family = existingToken.family;
 
-  user.refresh_tokens = user.refresh_tokens.filter((token) => token !== incomingRefreshToken);
-  user.refresh_tokens.push(newTokens.refreshToken);
+  // Generate new pair
+  const newTokens = generateTokenPair({ id: user._id, role: user.role });
+  const newHash = hashSecret(newTokens.refreshToken);
+
+  // Remove old token and save new token in the same family
+  user.refresh_tokens = user.refresh_tokens.filter((rt) => rt.token_hash !== incomingHash);
+  user.refresh_tokens.push({
+    token_hash: newHash,
+    family,
+    expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  });
+
   await user.save();
 
   return newTokens;
 };
 
 /**
- * Logout user
+ * Logout user - Revokes specific refresh token
  */
 export const logoutUserService = async (userId, refreshTokenToRevoke, fcmTokenToRevoke) => {
   const user = await User.findById(userId).select("+refresh_tokens +fcm_tokens");
   if (user) {
     if (refreshTokenToRevoke) {
-      user.refresh_tokens = user.refresh_tokens.filter((token) => token !== refreshTokenToRevoke);
+      const tokenHash = hashSecret(refreshTokenToRevoke);
+      user.refresh_tokens = (user.refresh_tokens || []).filter((rt) => rt.token_hash !== tokenHash);
     }
     if (fcmTokenToRevoke) {
-      user.fcm_tokens = user.fcm_tokens.filter((token) => token !== fcmTokenToRevoke);
+      user.fcm_tokens = (user.fcm_tokens || []).filter((token) => token !== fcmTokenToRevoke);
     }
     await user.save();
   }
 };
 
 /**
- * Helper to issue access + refresh tokens and update DB
+ * Helper to issue access + refresh tokens and register in token family
  */
 const issueUserTokens = async (user) => {
   const tokens = generateTokenPair({ id: user._id, role: user.role });
+  const family = crypto.randomUUID();
+  const tokenHash = hashSecret(tokens.refreshToken);
 
   if (!user.refresh_tokens) {
     user.refresh_tokens = [];
   }
-  user.refresh_tokens.push(tokens.refreshToken);
+
+  // Cap maximum concurrent sessions to 5 devices
+  if (user.refresh_tokens.length >= 5) {
+    user.refresh_tokens.shift();
+  }
+
+  user.refresh_tokens.push({
+    token_hash: tokenHash,
+    family,
+    expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  });
+
   await user.save();
 
   return {
@@ -271,7 +354,7 @@ const issueUserTokens = async (user) => {
 };
 
 /**
- * Helper to format clean user object response for mobile & web
+ * Helper to format clean user object response
  */
 const formatUserResponse = (user) => ({
   id: user._id,
@@ -280,6 +363,7 @@ const formatUserResponse = (user) => ({
   email: user.email,
   phone: user.phone,
   role: user.role,
+  active_clinic: user.active_clinic_id,
   auth_providers: user.auth_providers,
   is_email_verified: user.is_email_verified,
   is_phone_verified: user.is_phone_verified,

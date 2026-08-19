@@ -5,6 +5,7 @@ import {
   getClinicInvoices,
 } from "../../controllers/invoiceController.js";
 import { protect } from "../../middleware/authMiddleware.js";
+import { tenantGuard } from "../../middleware/tenantGuard.js";
 import { authorizeRoles } from "../../middleware/roleMiddleware.js";
 import { validate } from "../../middleware/validateSchema.js";
 import { createInvoiceSchema } from "../../validators/invoiceValidator.js";
@@ -12,6 +13,7 @@ import { createInvoiceSchema } from "../../validators/invoiceValidator.js";
 const router = express.Router();
 
 router.use(protect);
+router.use(tenantGuard);
 
 router.post(
   "/",

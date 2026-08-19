@@ -8,8 +8,10 @@ import {
   getPatientVitalsTimeline,
 } from "../../controllers/patientController.js";
 import { protect } from "../../middleware/authMiddleware.js";
-import { authorizeRoles, requireClinicAccess } from "../../middleware/roleMiddleware.js";
+import { tenantGuard } from "../../middleware/tenantGuard.js";
+import { authorizeRoles } from "../../middleware/roleMiddleware.js";
 import { validate } from "../../middleware/validateSchema.js";
+import { searchLimiter } from "../../middleware/rateLimiter.js";
 import {
   createPatientSchema,
   updatePatientSchema,
@@ -19,9 +21,10 @@ import {
 const router = express.Router();
 
 router.use(protect);
+router.use(tenantGuard);
 
-// 1. Search patients by phone / UHID / name
-router.get("/search", searchPatients);
+// 1. Search patients by phone / UHID / name with anti-scraping limiter
+router.get("/search", searchLimiter, searchPatients);
 
 // 2. Register new patient
 router.post(

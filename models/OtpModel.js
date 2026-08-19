@@ -14,8 +14,16 @@ const otpSchema = new Schema(
     },
     type: {
       type: String,
-      enum: ['email', 'phone'],
+      enum: ["email", "phone"],
       required: true,
+    },
+    attempts_count: {
+      type: Number,
+      default: 0,
+    },
+    last_requested_at: {
+      type: Date,
+      default: Date.now,
     },
     createdAt: {
       type: Date,
@@ -25,6 +33,6 @@ const otpSchema = new Schema(
   }
 );
 
-const Otp = mongoose.model('Otp', otpSchema);
+const Otp = mongoose.model("Otp", otpSchema);
 
 export default Otp;

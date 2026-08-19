@@ -11,6 +11,7 @@ import { connectDB } from "./config/db.js";
 import routes from "./routes/index.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { apiLimiter } from "./middleware/rateLimiter.js";
+import { sanitizeNoSql } from "./middleware/sanitizeNoSql.js";
 
 // Handle uncaught exceptions before server initialization
 process.on("uncaughtException", (err) => {
@@ -26,22 +27,47 @@ app.set("trust proxy", 1);
 // Connect to MongoDB Database
 connectDB();
 
-// Security HTTP Headers Middleware
-app.use(helmet());
+// Security HTTP Headers Middleware (HSTS, nosniff, X-Frame-Options, CSP)
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'", "https://api.sms-gateway-provider.com"],
+      },
+    },
+    frameguard: { action: "deny" }, // Clickjacking prevention
+    hidePoweredBy: true, // Conceal Express identity
+    hsts: {
+      maxAge: 31536000, // 1 year strict HTTPS
+      includeSubDomains: true,
+      preload: true,
+    },
+    noSniff: true, // Prevent MIME confusion
+    xssFilter: true,
+  })
+);
 
 // CORS Configuration
 app.use(
   cors({
     origin: config.corsOrigin,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-clinic-id"],
     credentials: true,
   })
 );
 
-// Global Body Parsing
-app.use(express.json({ limit: "10kb" })); // Defends against large payload Denial-of-Service
+// Global Body Parsing (10kb maximum payload defense)
+app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true, limit: "10kb" }));
+
+// Deep NoSQL Operator Injection Sanitization
+app.use(sanitizeNoSql);
 
 // General Rate Limiting for all API routes
 app.use("/api", apiLimiter);
