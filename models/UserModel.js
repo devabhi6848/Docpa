@@ -56,11 +56,16 @@ const userSchema = new Schema(
     role: {
       type: String,
       enum: {
-        values: ['patient', 'doctor', 'admin'],
+        values: ['patient', 'doctor', 'receptionist', 'nurse', 'clinic_admin', 'admin'],
         message: '{VALUE} is not a valid role',
       },
       required: [true, 'Role is required'],
       default: 'patient',
+    },
+    active_clinic_id: {
+      type: Schema.Types.ObjectId,
+      ref: 'Clinic',
+      default: null,
     },
     // Mobile App Device & Push Notification (FCM / APNs) Tracking
     fcm_tokens: {
