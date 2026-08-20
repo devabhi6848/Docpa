@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "Docpa",
+    "slug": "docpa-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#080C16"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.docpa.app",
+      "userInterfaceStyle": "dark"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#080C16"
+      },
+      "package": "com.docpa.app",
+      "userInterfaceStyle": "dark"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "e9bbd5a5-7905-4d79-a6ea-7c29b6102d82"
+      }
+    },
+    "owner": "abhi6848"
+  }
+}
