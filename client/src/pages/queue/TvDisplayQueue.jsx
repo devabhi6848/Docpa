@@ -54,8 +54,10 @@ export const TvDisplayQueue = () => {
     return () => clearInterval(interval);
   }, [fetchTvQueue]);
 
-  const nowCalling = data?.now_calling;
-  const waitingList = data?.waiting_queue || [];
+  const nowCalling =
+    data?.calling_now?.[0] || data?.now_calling || null;
+  const waitingList =
+    data?.upcoming || data?.waiting_queue || [];
   const clinic = data?.clinic || {};
 
   return (

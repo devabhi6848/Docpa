@@ -47,9 +47,13 @@ export const QueueDashboard = () => {
     setLoading(true);
     try {
       const res = await api.get('/v1/queue/today');
-      setQueue(res.data?.queue || []);
+      const queueList = Array.isArray(res.data?.queue)
+        ? res.data.queue
+        : res.data?.queue?.all || [];
+      setQueue(queueList);
     } catch (err) {
       console.error('Failed to fetch OPD queue:', err);
+      setQueue([]);
     } finally {
       setLoading(false);
     }
@@ -104,8 +108,10 @@ export const QueueDashboard = () => {
     }
   };
 
+  const safeQueue = Array.isArray(queue) ? queue : [];
+
   // Filtered Queue
-  const filteredQueue = queue.filter((item) => {
+  const filteredQueue = safeQueue.filter((item) => {
     const matchesStatus =
       filterStatus === 'all' || item.status === filterStatus;
     const patientName = item.patient_id?.name?.toLowerCase() || '';
@@ -120,10 +126,10 @@ export const QueueDashboard = () => {
   });
 
   // Statistics counters
-  const waitingCount = queue.filter((q) => q.status === 'waiting').length;
-  const withDoctorCount = queue.filter((q) => q.status === 'with_doctor').length;
-  const completedCount = queue.filter((q) => q.status === 'completed').length;
-  const totalCount = queue.length;
+  const waitingCount = safeQueue.filter((q) => q.status === 'waiting').length;
+  const withDoctorCount = safeQueue.filter((q) => q.status === 'with_doctor').length;
+  const completedCount = safeQueue.filter((q) => q.status === 'completed').length;
+  const totalCount = safeQueue.length;
 
   return (
     <div className="space-y-6">
