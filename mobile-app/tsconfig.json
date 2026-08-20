@@ -1,19 +1,21 @@
 {
   "compilerOptions": {
-    "target": "esnext",
-    "module": "esnext",
-    "moduleResolution": "bundler",
+    "target": "ESNext",
+    "module": "commonjs",
+    "lib": ["DOM", "ESNext"],
     "jsx": "react-native",
+    "noEmit": true,
     "strict": true,
+    "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true
+    "resolveJsonModule": true
   },
   "include": [
-    "**/*.ts",
-    "**/*.tsx"
+    "src/**/*",
+    "App.tsx",
+    "index.js"
   ],
   "exclude": [
     "node_modules",
