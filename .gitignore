@@ -1,2 +1,25 @@
-/node_modules
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Environment Variables
 .env
+.env.*
+!.env.example
+
+# Expo & Mobile builds
+.expo/
+mobile/.expo/
+mobile/dist/
+mobile/web-build/
+
+# Web client builds
+client/dist/
+dist/
+
+# OS & Logs
+.DS_Store
+Thumbs.db
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
